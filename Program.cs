@@ -1,7 +1,11 @@
+using Microsoft.EntityFrameworkCore;
+using event_driven_order_processor.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite("Data Source=orders.db"));
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
