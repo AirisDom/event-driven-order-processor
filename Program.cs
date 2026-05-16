@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using event_driven_order_processor.Data;
+using event_driven_order_processor.Models;
 using event_driven_order_processor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,24 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapPost("/orders", async (CreateOrderRequest request, AppDbContext db) =>
+{
+    var order = new Order
+    {
+        Id = Guid.NewGuid(),
+        CustomerName = request.CustomerName,
+        ProductName = request.ProductName,
+        Quantity = request.Quantity,
+        Status = OrderStatus.Pending,
+        CreatedAt = DateTime.UtcNow
+    };
+
+    db.Orders.Add(order);
+    await db.SaveChangesAsync();
+
+    return Results.Accepted($"/orders/{order.Id}", new { order.Id });
+});
 
 var summaries = new[]
 {
