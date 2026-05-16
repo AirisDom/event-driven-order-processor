@@ -48,6 +48,25 @@ app.MapPost("/orders", async (
     return Results.Accepted($"/orders/{order.Id}", new { order.Id });
 });
 
+app.MapGet("/orders/{id:guid}", async (Guid id, AppDbContext db) =>
+{
+    var order = await db.Orders.FindAsync(id);
+    if (order is null)
+    {
+        return Results.NotFound(new { message = $"Order with ID {id} not found" });
+    }
+
+    return Results.Ok(new
+    {
+        order.Id,
+        order.CustomerName,
+        order.ProductName,
+        order.Quantity,
+        Status = order.Status.ToString(),
+        order.CreatedAt
+    });
+});
+
 var summaries = new[]
 {
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
