@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using event_driven_order_processor.Data;
+using event_driven_order_processor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite("Data Source=orders.db"));
+
+builder.Services.AddSingleton<IMessageChannel, ChannelMessageBroker>();
 
 builder.Services.AddOpenApi();
 
