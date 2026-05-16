@@ -22,7 +22,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/orders", async (CreateOrderRequest request, AppDbContext db) =>
+app.MapPost("/orders", async (
+    CreateOrderRequest request,
+    AppDbContext db,
+    IMessageChannel messageChannel,
+    ILogger<Program> logger) =>
 {
     var order = new Order
     {
@@ -36,6 +40,10 @@ app.MapPost("/orders", async (CreateOrderRequest request, AppDbContext db) =>
 
     db.Orders.Add(order);
     await db.SaveChangesAsync();
+
+    var message = new OrderCreatedMessage(order.Id);
+    await messageChannel.WriteAsync(message);
+    logger.LogInformation("OrderCreated message published for OrderId: {OrderId}", order.Id);
 
     return Results.Accepted($"/orders/{order.Id}", new { order.Id });
 });
