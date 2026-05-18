@@ -50,5 +50,9 @@ public class OrderProcessorWorker : BackgroundService
         await dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Order {OrderId} processed successfully", message.OrderId);
+        _logger.LogInformation(
+            "Confirmation Email Sent to customer {CustomerName} for order {OrderId}",
+            order.CustomerName,
+            order.Id);
     }
 }
