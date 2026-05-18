@@ -24,9 +24,29 @@ public class OrderProcessorWorker : BackgroundService
     {
         _logger.LogInformation("OrderProcessorWorker starting");
 
-        await foreach (var message in _messageChannel.ReadAsync(stoppingToken))
+        try
         {
-            await ProcessOrderAsync(message, stoppingToken);
+            await foreach (var message in _messageChannel.ReadAsync(stoppingToken))
+            {
+                try
+                {
+                    await ProcessOrderAsync(message, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation("Order processing cancelled during shutdown");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing order {OrderId}", message.OrderId);
+                    await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("OrderProcessorWorker received shutdown signal");
         }
 
         _logger.LogInformation("OrderProcessorWorker shutting down");
