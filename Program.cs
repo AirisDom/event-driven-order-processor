@@ -31,6 +31,28 @@ app.MapPost("/orders", async (
     IMessageChannel messageChannel,
     ILogger<Program> logger) =>
 {
+    var validationErrors = new List<string>();
+
+    if (string.IsNullOrWhiteSpace(request.CustomerName))
+    {
+        validationErrors.Add("CustomerName is required");
+    }
+
+    if (string.IsNullOrWhiteSpace(request.ProductName))
+    {
+        validationErrors.Add("ProductName is required");
+    }
+
+    if (request.Quantity <= 0)
+    {
+        validationErrors.Add("Quantity must be greater than 0");
+    }
+
+    if (validationErrors.Count > 0)
+    {
+        return Results.BadRequest(new { errors = validationErrors });
+    }
+
     var order = new Order
     {
         Id = Guid.NewGuid(),
