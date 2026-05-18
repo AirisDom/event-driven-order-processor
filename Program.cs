@@ -51,6 +51,31 @@ app.MapPost("/orders", async (
     return Results.Accepted($"/orders/{order.Id}", new { order.Id });
 });
 
+app.MapGet("/orders", async (string? status, AppDbContext db) =>
+{
+    IQueryable<Order> query = db.Orders;
+
+    if (!string.IsNullOrEmpty(status) && Enum.TryParse<OrderStatus>(status, ignoreCase: true, out var parsedStatus))
+    {
+        query = query.Where(o => o.Status == parsedStatus);
+    }
+
+    var orders = await query
+        .OrderByDescending(o => o.CreatedAt)
+        .Select(o => new
+        {
+            o.Id,
+            o.CustomerName,
+            o.ProductName,
+            o.Quantity,
+            Status = o.Status.ToString(),
+            o.CreatedAt
+        })
+        .ToListAsync();
+
+    return Results.Ok(orders);
+});
+
 app.MapGet("/orders/{id:guid}", async (Guid id, AppDbContext db) =>
 {
     var order = await db.Orders.FindAsync(id);
