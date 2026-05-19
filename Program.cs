@@ -15,6 +15,9 @@ builder.Services.AddHostedService<OrderProcessorWorker>();
 
 builder.Services.AddOpenApi();
 
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AppDbContext>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -24,6 +27,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.MapHealthChecks("/health");
 
 app.MapPost("/orders", async (
     CreateOrderRequest request,
