@@ -54,25 +54,37 @@ public class OrderProcessorWorker : BackgroundService
 
     private async Task ProcessOrderAsync(OrderCreatedMessage message, CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Processing order {OrderId}", message.OrderId);
-
-        using var scope = _serviceScopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var order = await dbContext.Orders.FindAsync([message.OrderId], cancellationToken);
-        if (order is null)
+        using (_logger.BeginScope(new Dictionary<string, object> { ["OrderId"] = message.OrderId }))
         {
-            _logger.LogWarning("Order {OrderId} not found", message.OrderId);
-            return;
+            _logger.LogInformation("Processing order from queue");
+
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var order = await dbContext.Orders.FindAsync([message.OrderId], cancellationToken);
+            if (order is null)
+            {
+                _logger.LogWarning("Order not found in database");
+                return;
+            }
+
+            using (_logger.BeginScope(new Dictionary<string, object>
+            {
+                ["CustomerName"] = order.CustomerName,
+                ["ProductName"] = order.ProductName
+            }))
+            {
+                var previousStatus = order.Status;
+                order.Status = OrderStatus.Processed;
+                await dbContext.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation(
+                    "Order processed successfully, Status changed from {PreviousStatus} to {NewStatus}",
+                    previousStatus,
+                    order.Status);
+
+                _logger.LogInformation("Confirmation Email Sent to customer");
+            }
         }
-
-        order.Status = OrderStatus.Processed;
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Order {OrderId} processed successfully", message.OrderId);
-        _logger.LogInformation(
-            "Confirmation Email Sent to customer {CustomerName} for order {OrderId}",
-            order.CustomerName,
-            order.Id);
     }
 }

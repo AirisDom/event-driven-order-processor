@@ -6,8 +6,10 @@ using event_driven_order_processor.Workers;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=orders.db";
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=orders.db"));
+    options.UseSqlite(connectionString));
 
 builder.Services.AddSingleton<IMessageChannel, ChannelMessageBroker>();
 
@@ -68,12 +70,26 @@ app.MapPost("/orders", async (
         CreatedAt = DateTime.UtcNow
     };
 
-    db.Orders.Add(order);
-    await db.SaveChangesAsync();
+    using (logger.BeginScope(new Dictionary<string, object>
+    {
+        ["OrderId"] = order.Id,
+        ["CustomerName"] = order.CustomerName
+    }))
+    {
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
 
-    var message = new OrderCreatedMessage(order.Id);
-    await messageChannel.WriteAsync(message);
-    logger.LogInformation("OrderCreated message published for OrderId: {OrderId}", order.Id);
+        logger.LogInformation(
+            "Order created with Status={Status}, ProductName={ProductName}, Quantity={Quantity}",
+            order.Status,
+            order.ProductName,
+            order.Quantity);
+
+        var message = new OrderCreatedMessage(order.Id);
+        await messageChannel.WriteAsync(message);
+
+        logger.LogInformation("OrderCreated message published to queue");
+    }
 
     return Results.Accepted($"/orders/{order.Id}", new { order.Id });
 });
