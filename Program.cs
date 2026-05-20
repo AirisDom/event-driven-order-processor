@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using event_driven_order_processor.Data;
 using event_driven_order_processor.Models;
 using event_driven_order_processor.Services;
@@ -15,17 +16,30 @@ builder.Services.AddSingleton<IMessageChannel, ChannelMessageBroker>();
 
 builder.Services.AddHostedService<OrderProcessorWorker>();
 
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Event-Driven Order Processor API",
+        Version = "v1",
+        Description = "A scalable order processing API where orders are queued for background processing"
+    });
+});
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AppDbContext>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Event-Driven Order Processor API v1");
+        options.RoutePrefix = "swagger";
+    });
 }
 
 app.UseHttpsRedirection();
@@ -92,7 +106,13 @@ app.MapPost("/orders", async (
     }
 
     return Results.Accepted($"/orders/{order.Id}", new { order.Id });
-});
+})
+.WithName("CreateOrder")
+.WithSummary("Create a new order")
+.WithDescription("Creates a new order with Pending status and queues it for background processing. Returns immediately with 202 Accepted.")
+.Produces<object>(StatusCodes.Status202Accepted)
+.Produces<object>(StatusCodes.Status400BadRequest)
+.WithTags("Orders");
 
 app.MapGet("/orders", async (string? status, AppDbContext db) =>
 {
@@ -117,7 +137,12 @@ app.MapGet("/orders", async (string? status, AppDbContext db) =>
         .ToListAsync();
 
     return Results.Ok(orders);
-});
+})
+.WithName("GetAllOrders")
+.WithSummary("Get all orders")
+.WithDescription("Retrieves all orders, optionally filtered by status (Pending or Processed). Results are sorted by creation date descending.")
+.Produces<object[]>(StatusCodes.Status200OK)
+.WithTags("Orders");
 
 app.MapGet("/orders/{id:guid}", async (Guid id, AppDbContext db) =>
 {
@@ -136,7 +161,13 @@ app.MapGet("/orders/{id:guid}", async (Guid id, AppDbContext db) =>
         Status = order.Status.ToString(),
         order.CreatedAt
     });
-});
+})
+.WithName("GetOrderById")
+.WithSummary("Get an order by ID")
+.WithDescription("Retrieves a specific order by its unique identifier. Use this to check the processing status of an order.")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces<object>(StatusCodes.Status404NotFound)
+.WithTags("Orders");
 
 var summaries = new[]
 {
@@ -155,7 +186,8 @@ app.MapGet("/weatherforecast", () =>
         .ToArray();
     return forecast;
 })
-.WithName("GetWeatherForecast");
+.WithName("GetWeatherForecast")
+.ExcludeFromDescription();
 
 app.Run();
 
